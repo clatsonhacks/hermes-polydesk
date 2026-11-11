@@ -1,0 +1,101 @@
+name: e2e
+
+# Unit tests, the Hermes plugin-catalog admission checks run exactly as the catalog CI runs
+# them (structural + pinned-sha validate), then a live end-to-end run through a real Hermes
+# install against the live Polymarket API and Base Sepolia.
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest==8.3.4
+      - run: python -m pytest tests -q
+
+  hermes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plugin
+          persist-credentials: false
+
+      - name: Clone Hermes (full history so the version resolves from tags)
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/NousResearch/hermes-agent.git "$RUNNER_TEMP/hermes"
+          git -C "$RUNNER_TEMP/hermes" log -1 --format='Hermes main @ %h %cd'
+
+      - name: Prepare the locked Python toolchain
+        working-directory: ${{ runner.temp }}/hermes
+        run: |
+          set -euo pipefail
+          python3 -S scripts/ci/setup_toolchain.py prepare --toolchain python --home "$RUNNER_TEMP/hermes/.build/pm"
+          python3 -S scripts/ci/setup_toolchain.py install --toolchain python --home "$RUNNER_TEMP/hermes/.build/pm"
+
+      - name: Build the Hermes runtime and put `hermes` on PATH
+        working-directory: ${{ runner.temp }}/hermes
+        run: |
+          set -euo pipefail
+          py=$("$HERMES_PYTHON" - <<'PY'
+          from pathlib import Path
+          import os
+          from pm import build_environment
+          src = Path(os.getcwd())
+          print(build_environment(source=src, out=src / ".build/validator", explicit=True))
+          PY
+          )
+          mkdir -p "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec "%s" -m hermes_cli.main "$@"\n' "$py" > "$RUNNER_TEMP/bin/hermes"
+          chmod +x "$RUNNER_TEMP/bin/hermes"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          echo "HERMES_RUNTIME_PY=$py" >> "$GITHUB_ENV"
+          echo "HERMES_HOME=$RUNNER_TEMP/hermes-home" >> "$GITHUB_ENV"
+
+      - name: hermes plugins validate (same as catalog CI)
+        run: |
+          set -euo pipefail
+          hermes --version || true
+          hermes plugins validate --install-deps "$GITHUB_WORKSPACE/plugin"
+
+      - name: Catalog structural check on our entry
+        working-directory: ${{ runner.temp }}/hermes
+        run: |
+          set -euo pipefail
+          sed "s/PINNED_SHA/$GITHUB_SHA/" "$GITHUB_WORKSPACE/plugin/.github/catalog-entry.yaml" > plugin-catalog/polydesk.yaml
+          pip install ruamel.yaml==0.18.17
+          python3 scripts/validate_plugin_catalog.py plugin-catalog/
+
+      - name: Catalog pinned-sha gate (clone at this sha, validate, payload and self-update scans)
+        working-directory: ${{ runner.temp }}/hermes
+        env:
+          CHANGED_FILES: plugin-catalog/polydesk.yaml
+          GIT_TERMINAL_PROMPT: "0"
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I scripts/ci/catalog_validate_pinned_entries.py
+
+      - name: Install the plugin into a fresh Hermes profile
+        run: |
+          set -euo pipefail
+          mkdir -p "$HERMES_HOME/plugins/polydesk"
+          cd "$GITHUB_WORKSPACE/plugin"
+          git ls-files -z | grep -zv '^\.github/' | xargs -0 cp --parents -t "$HERMES_HOME/plugins/polydesk"
+          hermes plugins enable polydesk
+          hermes plugins list
+          hermes plugins show polydesk || true
+
+      - name: Live end-to-end (real Polymarket + Base Sepolia through Hermes tool dispatch)
+        working-directory: ${{ runner.temp }}/hermes
+        run: '"$HERMES_RUNTIME_PY" "$GITHUB_WORKSPACE/plugin/tests/live_e2e.py"'
