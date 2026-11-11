@@ -66,7 +66,9 @@ def main() -> None:
     from model_tools import get_tool_definitions, handle_function_call
 
     discover_plugins(force=True)
-    names = {t.get("function", t).get("name") for t in get_tool_definitions(quiet_mode=True)}
+    # skip_tool_search_assembly: the full catalog, before Hermes folds tools behind tool_search.
+    names = {t.get("function", t).get("name")
+             for t in get_tool_definitions(quiet_mode=True, skip_tool_search_assembly=True)}
     want = {"polydesk_markets", "polydesk_trade", "polydesk_portfolio", "polydesk_history", "polydesk_wallet"}
     if not want <= names:
         step("Hermes discovers all 5 tools", False, diagnose(names))
