@@ -12,7 +12,7 @@ resolve. The bankroll can be backed 1:1 by testnet USDC in your **Base Sepolia**
 
 - **Real fills, real slippage.** Every order walks the live CLOB book level by level, so a
   $500 buy in a thin market gets the price it would actually get, not the headline odds.
-- **Quote, then confirm.** A trade first returns a single-use ticket that expires in 120 seconds.
+- **Quote, then confirm.** A trade first returns a single-use ticket that expires in 5 minutes.
   At execution it's re-priced against a fresh book and rejected if the price moved against you.
 - **Risk limits.** Max per-trade size, max % of equity in one outcome, a max-slippage sweep
   guard, cash checks, and a liquidity check. Rejections explain exactly why.

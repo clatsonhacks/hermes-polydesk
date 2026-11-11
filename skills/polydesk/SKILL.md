@@ -21,6 +21,8 @@ prediction market without real money.
 4. **Execute.** Call `polydesk_trade` with only `ticket_id`. The order is re-priced against
    the live book, and if the price moved against the user by more than `max_slippage` it is
    rejected. In that case, quote again.
+   Tickets expire after 5 minutes. A fresh quote is a new price, so show it and get a new
+   yes before executing it. Never execute a re-quoted ticket on an earlier confirmation.
 5. **Track.** `polydesk_portfolio` marks positions to market and settles resolved markets.
    `polydesk_history` lists activity.
 

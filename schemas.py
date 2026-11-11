@@ -27,7 +27,7 @@ TRADE = {
         "real book levels, so slippage is realistic. Two steps: (1) call without ticket_id to get a "
         "quote + risk check + ticket_id; show the user the shares, average price, cost and max "
         "payout and ask them to confirm; (2) only after the user confirms, call again with just "
-        "ticket_id to execute. Tickets expire after 120 s and are re-priced at execution. "
+        "ticket_id to execute. Tickets expire after 5 minutes and are re-priced at execution; if one expires, preview again and get the user's confirmation again. "
         "Buy with amount_usd; sell with shares (omit shares to sell the whole position)."
     ),
     "parameters": {

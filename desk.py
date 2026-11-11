@@ -18,7 +18,7 @@ from typing import Any, Callable, Optional
 
 from . import polymarket as pm
 
-TICKET_TTL = 120.0
+TICKET_TTL = 300.0  # long enough for a slow model plus a human reply; execution re-prices anyway
 EPS = 1e-9
 
 _SCHEMA = """
