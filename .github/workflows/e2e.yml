@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pytest==8.3.4
-      - run: python -m pytest tests -q
+      - run: bash .github/annotate.sh "unit tests" python -m pytest tests -q --tb=short -p no:cacheprovider
 
   hermes:
     runs-on: ubuntu-latest
@@ -37,6 +37,11 @@ jobs:
           set -euo pipefail
           git clone --filter=blob:none https://github.com/NousResearch/hermes-agent.git "$RUNNER_TEMP/hermes"
           git -C "$RUNNER_TEMP/hermes" log -1 --format='Hermes main @ %h %cd'
+          echo "A=$GITHUB_WORKSPACE/plugin/.github/annotate.sh" >> "$GITHUB_ENV"
+          # A private interpreter for the catalog scripts, independent of the Hermes toolchain PATH.
+          /usr/bin/python3 -m venv "$RUNNER_TEMP/catvenv"
+          "$RUNNER_TEMP/catvenv/bin/pip" install -q ruamel.yaml==0.18.17
+          echo "CATPY=$RUNNER_TEMP/catvenv/bin/python" >> "$GITHUB_ENV"
 
       - name: Prepare the locked Python toolchain
         working-directory: ${{ runner.temp }}/hermes
@@ -66,17 +71,15 @@ jobs:
 
       - name: hermes plugins validate (same as catalog CI)
         run: |
-          set -euo pipefail
           hermes --version || true
-          hermes plugins validate --install-deps "$GITHUB_WORKSPACE/plugin"
+          bash "$A" "hermes plugins validate" hermes plugins validate --install-deps "$GITHUB_WORKSPACE/plugin"
 
       - name: Catalog structural check on our entry
         working-directory: ${{ runner.temp }}/hermes
         run: |
           set -euo pipefail
           sed "s/PINNED_SHA/$GITHUB_SHA/" "$GITHUB_WORKSPACE/plugin/.github/catalog-entry.yaml" > plugin-catalog/polydesk.yaml
-          pip install ruamel.yaml==0.18.17
-          python3 scripts/validate_plugin_catalog.py plugin-catalog/
+          bash "$A" "catalog structural" "$CATPY" scripts/validate_plugin_catalog.py plugin-catalog/
 
       - name: Catalog pinned-sha gate (clone at this sha, validate, payload and self-update scans)
         working-directory: ${{ runner.temp }}/hermes
@@ -84,7 +87,7 @@ jobs:
           CHANGED_FILES: plugin-catalog/polydesk.yaml
           GIT_TERMINAL_PROMPT: "0"
           GH_TOKEN: ${{ github.token }}
-        run: python3 -I scripts/ci/catalog_validate_pinned_entries.py
+        run: bash "$A" "catalog pinned-sha gate" "$CATPY" -I scripts/ci/catalog_validate_pinned_entries.py
 
       - name: Install the plugin into a fresh Hermes profile
         run: |
@@ -92,10 +95,10 @@ jobs:
           mkdir -p "$HERMES_HOME/plugins/polydesk"
           cd "$GITHUB_WORKSPACE/plugin"
           git ls-files -z | grep -zv '^\.github/' | xargs -0 cp --parents -t "$HERMES_HOME/plugins/polydesk"
-          hermes plugins enable polydesk
-          hermes plugins list
+          bash "$A" "plugins enable" hermes plugins enable polydesk
+          bash "$A" "plugins list" hermes plugins list
           hermes plugins show polydesk || true
 
       - name: Live end-to-end (real Polymarket + Base Sepolia through Hermes tool dispatch)
         working-directory: ${{ runner.temp }}/hermes
-        run: '"$HERMES_RUNTIME_PY" "$GITHUB_WORKSPACE/plugin/tests/live_e2e.py"'
+        run: bash "$A" "live e2e" "$HERMES_RUNTIME_PY" "$GITHUB_WORKSPACE/plugin/tests/live_e2e.py"
