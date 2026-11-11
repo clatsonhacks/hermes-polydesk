@@ -90,7 +90,9 @@ jobs:
         run: |
           # The gate shells out to `python3` for its entry parser, which needs ruamel.yaml.
           export PATH="$RUNNER_TEMP/catvenv/bin:$PATH"
-          bash "$A" "catalog pinned-sha gate" "$CATPY" -I scripts/ci/catalog_validate_pinned_entries.py
+          # In the catalog CI the workspace IS the hermes-agent checkout; the gate resolves its
+          # payload scanner from there.
+          GITHUB_WORKSPACE="$RUNNER_TEMP/hermes" bash "$A" "catalog pinned-sha gate" "$CATPY" -I scripts/ci/catalog_validate_pinned_entries.py
 
       - name: Install the plugin into a fresh Hermes profile
         run: |
