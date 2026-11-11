@@ -1,0 +1,52 @@
+name: polydesk
+version: 1.0.0
+manifest_version: 2
+description: "Agent paper-trading desk for Polymarket: fills against the live order book with real slippage, quote-then-confirm tickets, risk limits, P&L, auto-settlement on resolution, and a bankroll backed by a Base Sepolia testnet wallet. No keys, no real money."
+author: clatsonhacks
+license: MIT
+homepage: https://github.com/clatsonhacks/hermes-polydesk
+tags: [polymarket, prediction-markets, paper-trading, base-sepolia, testnet, trading]
+requires_hermes: ">=0.21.5"
+provides_tools:
+  - polydesk_markets
+  - polydesk_trade
+  - polydesk_portfolio
+  - polydesk_history
+  - polydesk_wallet
+provides_hooks: []
+config_schema:
+  demo_bankroll:
+    type: float
+    default: 1000
+    label: "Demo bankroll (paper USDC)"
+    description: "Unbacked paper cash granted on first use. Set 0 to trade only with testnet-backed deposits."
+  max_trade_usd:
+    type: float
+    default: 250
+    label: "Max per trade (USD)"
+    description: "Trades larger than this are rejected."
+  max_position_pct:
+    type: float
+    default: 25
+    label: "Max position size (% of equity)"
+    description: "A single outcome may not exceed this share of equity."
+  max_slippage:
+    type: float
+    default: 0.03
+    label: "Max slippage (price points)"
+    description: "Reject fills that sweep the book further than this from the best price, or that re-price this much worse at execution."
+  auto_execute:
+    type: bool
+    default: false
+    label: "Execute without confirmation"
+    description: "Skip the quote-then-confirm ticket step (useful for scheduled strategies)."
+  rpc_url:
+    type: str
+    default: "https://sepolia.base.org"
+    label: "Base Sepolia RPC URL"
+    description: "HTTPS JSON-RPC endpoint for Base Sepolia (chain 84532)."
+  wallet_address:
+    type: str
+    default: ""
+    label: "Testnet wallet address"
+    description: "Optional 0x address to back the bankroll (can also be linked from chat). Public address only, never a key."
