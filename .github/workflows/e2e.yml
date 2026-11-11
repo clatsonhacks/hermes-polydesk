@@ -87,7 +87,10 @@ jobs:
           CHANGED_FILES: plugin-catalog/polydesk.yaml
           GIT_TERMINAL_PROMPT: "0"
           GH_TOKEN: ${{ github.token }}
-        run: bash "$A" "catalog pinned-sha gate" "$CATPY" -I scripts/ci/catalog_validate_pinned_entries.py
+        run: |
+          # The gate shells out to `python3` for its entry parser, which needs ruamel.yaml.
+          export PATH="$RUNNER_TEMP/catvenv/bin:$PATH"
+          bash "$A" "catalog pinned-sha gate" "$CATPY" -I scripts/ci/catalog_validate_pinned_entries.py
 
       - name: Install the plugin into a fresh Hermes profile
         run: |
