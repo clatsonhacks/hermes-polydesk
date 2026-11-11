@@ -37,6 +37,30 @@ def finish(code: int) -> None:
     sys.exit(code)
 
 
+def diagnose(names: set) -> str:
+    """Why are the tools missing? Report Hermes' own view of the plugin."""
+    out = [f"HERMES_HOME={os.environ.get('HERMES_HOME')}", f"{len(names)} tools visible"]
+    try:
+        from hermes_cli.plugins import get_plugin_manager
+        mgr = get_plugin_manager()
+        for key, p in getattr(mgr, "_plugins", {}).items():
+            if "poly" in key or "poly" in getattr(p.manifest, "name", ""):
+                out.append(f"plugin {key}: enabled={p.enabled} error={p.error} deferred={p.deferred} "
+                           f"tools={p.tools_registered} commands={p.commands_registered}")
+        out.append("loaded plugins: " + ", ".join(sorted(getattr(mgr, "_plugins", {}).keys()))[:600])
+    except Exception as exc:
+        out.append(f"plugin manager probe failed: {exc!r}")
+    try:
+        from tools.registry import registry
+        m = registry.get_tool_to_toolset_map()
+        out.append("registry polydesk: " + str({k: v for k, v in m.items() if "polydesk" in k}))
+    except Exception as exc:
+        out.append(f"registry probe failed: {exc!r}")
+    msg = " || ".join(out)
+    print(msg, flush=True)
+    return msg
+
+
 def main() -> None:
     from hermes_cli.plugins import discover_plugins
     from model_tools import get_tool_definitions, handle_function_call
@@ -44,7 +68,9 @@ def main() -> None:
     discover_plugins(force=True)
     names = {t.get("function", t).get("name") for t in get_tool_definitions(quiet_mode=True)}
     want = {"polydesk_markets", "polydesk_trade", "polydesk_portfolio", "polydesk_history", "polydesk_wallet"}
-    step("Hermes discovers all 5 tools", want <= names, ", ".join(sorted(want & names)))
+    if not want <= names:
+        step("Hermes discovers all 5 tools", False, diagnose(names))
+    step("Hermes discovers all 5 tools", True, ", ".join(sorted(want & names)))
 
     def call(tool: str, **args) -> dict:
         raw = handle_function_call(tool, args, task_id="e2e", session_id="e2e")

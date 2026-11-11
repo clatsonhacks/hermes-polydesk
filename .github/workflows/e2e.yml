@@ -103,6 +103,9 @@ jobs:
           bash "$A" "plugins enable" hermes plugins enable polydesk
           bash "$A" "plugins list" hermes plugins list
           hermes plugins show polydesk || true
+          # Publish what Hermes reports about the plugin (readable without login).
+          body=$( { hermes plugins list 2>&1 | grep -i -A3 poly; hermes plugins show polydesk 2>&1; } | tail -n 40 | sed -e 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+          echo "::notice title=hermes plugins show polydesk::${body}"
 
       - name: Live end-to-end (real Polymarket + Base Sepolia through Hermes tool dispatch)
         working-directory: ${{ runner.temp }}/hermes
